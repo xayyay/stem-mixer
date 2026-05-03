@@ -46,7 +46,7 @@ pip install -r requirements.txt
 python app.py
 
 # 4. Open in browser
-open http://localhost:5000
+open http://localhost:5056
 ```
 
 On first use, Demucs will download its AI model (~80 MB). After that,
