@@ -399,6 +399,13 @@ body {
       <div class="load-tabs">
         <button class="tab active" onclick="switchTab('file')">Local File</button>
         <button class="tab" onclick="switchTab('youtube')">YouTube URL</button>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)">
+          Stems:
+          <select id="modelSelect" class="sort-select" style="font-size:11px">
+            <option value="htdemucs_6s" selected>6 stems — Drums · Bass · Vocals · Guitar · Piano · Other</option>
+            <option value="htdemucs">4 stems — Drums · Bass · Vocals · Other (faster)</option>
+          </select>
+        </div>
       </div>
 
       <div class="load-panel visible" id="tab-file">
@@ -512,10 +519,11 @@ body {
 const STEM_META = {
   drums:  { label:'Drums',  icon:'🥁', color:'#f04040' },
   bass:   { label:'Bass',   icon:'🎸', color:'#3b8df5' },
-  other:  { label:'Guitar', icon:'🎵', color:'#22c55e' },
   vocals: { label:'Vocals', icon:'🎤', color:'#f59e0b' },
+  guitar: { label:'Guitar', icon:'🎸', color:'#22c55e' },
   piano:  { label:'Piano',  icon:'🎹', color:'#a78bfa' },
-  melody: { label:'Melody', icon:'🎷', color:'#e879f9' },
+  other:  { label:'Other',  icon:'🎵', color:'#e879f9' },
+  melody: { label:'Melody', icon:'🎷', color:'#60a5fa' },
 };
 
 let ctx = null;
@@ -673,6 +681,7 @@ async function handleFile(file) {
   if (!file) return;
   const fd = new FormData();
   fd.append('file', file);
+  fd.append('model', document.getElementById('modelSelect').value);
   showJob('Uploading…', 0);
   const d = await (await fetch('/upload', { method:'POST', body:fd })).json();
   if (d.error) { showJobError(d.error); return; }
@@ -686,7 +695,7 @@ async function handleYoutube() {
   showJob('Submitting URL…', 0);
   const d = await (await fetch('/youtube', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ url })
+    body: JSON.stringify({ url, model: document.getElementById('modelSelect').value })
   })).json();
   if (d.error) { showJobError(d.error); return; }
   if (d.title) showJob('Fetched: ' + d.title, 0);
@@ -788,6 +797,7 @@ async function loadStems(songId, stemMap, dur, song) {
   document.getElementById('seekBar').max = duration;
   document.getElementById('tTime').textContent = '0:00 / ' + fmtTime(duration);
   buildMixerUI(stemKeys);
+  restoreMixerState(songId);
   loadPresetsPanel(songId);
   showJob('Ready', 100);
 }
@@ -1010,31 +1020,82 @@ function buildMixerUI(stemKeys) {
   grid.appendChild(master);
 }
 
+function saveMixerState() {
+  if (!currentSongId) return;
+  const state = {};
+  Object.entries(stemState).forEach(([k, s]) => state[k] = { ...s });
+  state['_master'] = { vol: masterVol };
+  localStorage.setItem('stemixer_' + currentSongId, JSON.stringify(state));
+}
+
+function restoreMixerState(songId) {
+  try {
+    const raw = localStorage.getItem('stemixer_' + songId);
+    if (!raw) return;
+    const state = JSON.parse(raw);
+    Object.entries(state).forEach(([k, s]) => {
+      if (k === '_master') {
+        masterVol = s.vol ?? 0.8;
+        if (audioNodes['_master']) audioNodes['_master'].gain.value = masterVol;
+        document.getElementById('mv-pct') && (document.getElementById('mv-pct').textContent = Math.round(masterVol*100) + '%');
+        const mf = document.querySelector('.channel.master .fader');
+        if (mf) mf.value = masterVol;
+        return;
+      }
+      if (!stemState[k]) return;
+      stemState[k].vol    = s.vol    ?? 0.8;
+      stemState[k].pan    = s.pan    ?? 0;
+      stemState[k].muted  = s.muted  ?? false;
+      stemState[k].soloed = s.soloed ?? false;
+      // sync fader
+      const fader = document.querySelector(`#ch-${k} .fader`);
+      if (fader) fader.value = stemState[k].vol;
+      const fv = document.getElementById('fv-' + k);
+      if (fv) fv.textContent = Math.round(stemState[k].vol * 100) + '%';
+      // sync pan
+      const pan = document.querySelector(`#ch-${k} .pan`);
+      if (pan) pan.value = stemState[k].pan;
+      if (audioNodes[k]) audioNodes[k].pan.pan.value = stemState[k].pan;
+      // sync mute/solo buttons
+      document.getElementById('mute-' + k)?.classList.toggle('mute-on', stemState[k].muted);
+      document.getElementById('ch-'   + k)?.classList.toggle('muted',   stemState[k].muted);
+      document.getElementById('solo-' + k)?.classList.toggle('solo-on', stemState[k].soloed);
+      document.getElementById('ch-'   + k)?.classList.toggle('soloed',  stemState[k].soloed);
+    });
+    if (ctx) applyGains();
+  } catch(e) { console.error('restoreMixerState error', e); }
+}
+
 function setVol(key, val) {
   stemState[key].vol = parseFloat(val);
   document.getElementById('fv-'+key).textContent = Math.round(val*100) + '%';
   if (ctx) applyGains();
+  saveMixerState();
 }
 function setPan(key, val) {
   stemState[key].pan = parseFloat(val);
   if (audioNodes[key]) audioNodes[key].pan.pan.setTargetAtTime(parseFloat(val), ctx.currentTime, 0.01);
+  saveMixerState();
 }
 function setMaster(val) {
   masterVol = parseFloat(val);
   document.getElementById('mv-pct').textContent = Math.round(val*100) + '%';
   if (audioNodes['_master']) audioNodes['_master'].gain.value = masterVol;
+  saveMixerState();
 }
 function toggleMute(key) {
   stemState[key].muted = !stemState[key].muted;
   document.getElementById('mute-'+key).classList.toggle('mute-on', stemState[key].muted);
   document.getElementById('ch-'+key).classList.toggle('muted',    stemState[key].muted);
   if (ctx) applyGains();
+  saveMixerState();
 }
 function toggleSolo(key) {
   stemState[key].soloed = !stemState[key].soloed;
   document.getElementById('solo-'+key).classList.toggle('solo-on', stemState[key].soloed);
   document.getElementById('ch-'+key).classList.toggle('soloed',    stemState[key].soloed);
   if (ctx) applyGains();
+  saveMixerState();
 }
 
 // ────────────────────────────────────────────────────────────────────────────

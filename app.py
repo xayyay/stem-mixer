@@ -373,22 +373,26 @@ def upload():
     if ext not in {".mp3", ".wav", ".flac", ".m4a", ".ogg", ".mp4", ".mkv", ".webm"}:
         return jsonify({"error": f"Unsupported format: {ext}"}), 400
     title  = Path(f.filename).stem
+    model  = request.form.get("model", "htdemucs_6s")
+    if model not in {"htdemucs", "htdemucs_6s", "htdemucs_ft"}:
+        model = "htdemucs_6s"
     job_id = uuid.uuid4().hex[:8]
     dst    = UPLOAD_DIR / f"{job_id}{ext}"
     f.save(dst)
     jobs[job_id] = {"status": "queued", "progress": 0, "message": "Queued", "stems": {}}
-    threading.Thread(target=run_demucs, args=(job_id, dst, STEMS_DIR, title),
+    threading.Thread(target=run_demucs, args=(job_id, dst, STEMS_DIR, title, "file", "", "", model),
                      daemon=True).start()
     return jsonify({"job_id": job_id})
 
 @app.route("/youtube", methods=["POST"])
 def youtube():
-    data = request.get_json(force=True) or {}
-    url  = data.get("url", "").strip()
+    data  = request.get_json(force=True) or {}
+    url   = data.get("url", "").strip()
+    model = data.get("model", "htdemucs_6s")
+    if model not in {"htdemucs", "htdemucs_6s", "htdemucs_ft"}:
+        model = "htdemucs_6s"
     if not url:
         return jsonify({"error": "No URL"}), 400
-    if not check_ytdlp():
-        return jsonify({"error": "yt-dlp not installed. Run: pip install yt-dlp"}), 500
     info   = get_yt_info(url)
     job_id = uuid.uuid4().hex[:8]
     dst    = UPLOAD_DIR / f"{job_id}.mp4"
@@ -396,7 +400,7 @@ def youtube():
                     "stems": {}, "title": info["title"]}
     threading.Thread(
         target=run_ytdlp,
-        args=(job_id, url, dst, info["title"], info["thumbnail"], info["uploader"]),
+        args=(job_id, url, dst, info["title"], info["thumbnail"], info["uploader"], model),
         daemon=True).start()
     return jsonify({"job_id": job_id, "title": info["title"]})
 
