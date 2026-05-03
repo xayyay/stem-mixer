@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Stem Mixer</title>
+<style>
+:root {
+  --bg:        #0e0e10;
+  --bg2:       #18181c;
+  --bg3:       #202026;
+  --bg4:       #28282f;
+  --bg5:       #313138;
+  --border:    #2e2e38;
+  --border2:   #3d3d4a;
+  --text:      #e8e8f0;
+  --muted:     #62626e;
+  --muted2:    #888896;
+  --accent:    #7c6af7;
+  --accent2:   #9b8cff;
+  --red:       #f04040;
+  --green:     #22c55e;
+  --amber:     #f59e0b;
+  --blue:      #3b8df5;
+  --r:         8px;
+  --rl:        14px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'SF Mono','Fira Code','Cascadia Code',monospace;
+  background: var(--bg); color: var(--text);
+  font-size: 13px; display: flex; flex-direction: column;
+}
+
+/* ── Topbar ── */
+.topbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 18px; height: 50px; flex-shrink: 0;
+  border-bottom: 1px solid var(--border); background: var(--bg2);
+  position: relative; z-index: 60;
+}
+.logo { font-size: 14px; font-weight: 700; color: var(--accent2); letter-spacing: .06em; }
+.logo span { color: var(--muted); font-weight: 400; }
+.pill {
+  font-size: 10px; padding: 2px 8px; border-radius: 20px;
+  border: 1px solid; letter-spacing: .06em; text-transform: uppercase;
+}
+.pill-ok   { border-color: var(--green); color: var(--green); }
+.pill-warn { border-color: var(--amber); color: var(--amber); }
+.dep-bar { margin-left: auto; display: flex; gap: 10px; align-items: center; font-size: 11px; color: var(--muted); }
+.dep-ok  { color: var(--green); }
+.dep-bad { color: var(--red); }
+
+/* ── Body layout ── */
+.body { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Library sidebar ── */
+.sidebar {
+  width: 260px; flex-shrink: 0;
+  background: var(--bg2); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.sidebar-head {
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.sidebar-head h2 { font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--muted2); flex: 1; }
+.sort-select {
+  font-family: inherit; font-size: 10px; background: var(--bg3);
+  border: 1px solid var(--border2); color: var(--muted2); border-radius: 5px;
+  padding: 3px 6px; cursor: pointer; outline: none;
+}
+.search-wrap { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.search-input {
+  width: 100%; padding: 7px 10px; border-radius: var(--r);
+  border: 1px solid var(--border2); background: var(--bg3);
+  color: var(--text); font-family: inherit; font-size: 12px; outline: none;
+}
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--muted); }
+.lib-list { flex: 1; overflow-y: auto; padding: 6px; }
+.lib-empty { padding: 24px 12px; text-align: center; color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+.song-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: var(--r); cursor: pointer;
+  border: 1px solid transparent; transition: all .12s; margin-bottom: 3px;
+  position: relative;
+}
+.song-card:hover { background: var(--bg3); border-color: var(--border); }
+.song-card.active { background: var(--bg4); border-color: var(--accent); }
+.song-thumb {
+  width: 38px; height: 38px; border-radius: 6px; flex-shrink: 0;
+  background: var(--bg4); display: flex; align-items: center; justify-content: center;
+  font-size: 16px; overflow: hidden;
+}
+.song-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.song-info { flex: 1; min-width: 0; }
+.song-title { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.song-meta  { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.song-del {
+  width: 22px; height: 22px; border-radius: 4px; border: none;
+  background: transparent; color: var(--muted); cursor: pointer;
+  font-size: 12px; display: none; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.song-card:hover .song-del { display: flex; }
+.song-del:hover { background: rgba(240,64,64,.15); color: var(--red); }
+
+.src-badge {
+  font-size: 9px; padding: 1px 5px; border-radius: 3px;
+  text-transform: uppercase; letter-spacing: .05em; margin-left: 4px;
+  vertical-align: middle;
+}
+.src-yt   { background: rgba(240,64,64,.15); color: #f87171; }
+.src-file { background: rgba(124,106,247,.15); color: var(--accent2); }
+
+/* ── Main pane ── */
+.main-pane {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+
+/* ── Load zone ── */
+.load-zone {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  background: var(--bg2); flex-shrink: 0;
+}
+.load-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+.tab {
+  padding: 5px 14px; border-radius: var(--r); border: 1px solid var(--border2);
+  background: transparent; color: var(--muted); cursor: pointer;
+  font-family: inherit; font-size: 12px; transition: all .12s;
+}
+.tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tab:hover:not(.active) { color: var(--text); border-color: var(--border2); }
+.load-panel { display: none; }
+.load-panel.visible { display: block; }
+
+.drop-zone {
+  border: 2px dashed var(--border2); border-radius: var(--rl);
+  padding: 28px 20px; text-align: center; cursor: pointer;
+  transition: all .2s; position: relative;
+}
+.drop-zone:hover, .drop-zone.over {
+  border-color: var(--accent); background: rgba(124,106,247,.04);
+}
+.drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.drop-icon { font-size: 26px; margin-bottom: 6px; }
+.drop-text { color: var(--muted); line-height: 1.6; font-size: 12px; }
+.drop-text strong { color: var(--text); display: block; font-size: 13px; margin-bottom: 2px; }
+
+.yt-row { display: flex; gap: 8px; }
+.yt-row input {
+  flex: 1; padding: 9px 12px; border-radius: var(--r);
+  border: 1px solid var(--border2); background: var(--bg3);
+  color: var(--text); font-family: inherit; font-size: 13px; outline: none;
+}
+.yt-row input:focus { border-color: var(--accent); }
+.yt-row input::placeholder { color: var(--muted); }
+
+.btn {
+  padding: 9px 18px; border-radius: var(--r); border: none;
+  cursor: pointer; font-family: inherit; font-size: 13px;
+  font-weight: 500; transition: all .12s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent2); }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+.btn-sm {
+  padding: 5px 11px; font-size: 11px; border-radius: 6px;
+  border: 1px solid var(--border2); background: var(--bg3);
+  color: var(--text); cursor: pointer; font-family: inherit;
+}
+.btn-sm:hover { background: var(--bg4); }
+
+.job-bar {
+  margin-top: 12px; padding: 10px 14px; border-radius: var(--r);
+  background: var(--bg3); border: 1px solid var(--border);
+  display: none; align-items: center; gap: 10px;
+}
+.job-bar.visible { display: flex; }
+.job-msg { flex: 1; }
+.job-title { font-size: 12px; }
+.job-sub   { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.prog-wrap { width: 120px; height: 3px; background: var(--bg5); border-radius: 2px; flex-shrink: 0; }
+.prog-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width .3s; }
+.spinner {
+  width: 13px; height: 13px; border: 2px solid var(--border2);
+  border-top-color: var(--accent); border-radius: 50%;
+  animation: spin .7s linear infinite; flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Mixer zone ── */
+.mixer-zone { flex: 1; overflow-y: auto; padding: 18px 20px; }
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; height: 220px; color: var(--muted);
+  gap: 8px; text-align: center;
+}
+.empty-state .big { font-size: 40px; opacity: .25; }
+.empty-state p { font-size: 12px; line-height: 1.7; max-width: 280px; }
+
+/* ── Now playing bar ── */
+.now-playing {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--rl); padding: 12px 18px;
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 18px; display: none;
+}
+.np-thumb {
+  width: 44px; height: 44px; border-radius: 8px; background: var(--bg4);
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+  flex-shrink: 0; overflow: hidden;
+}
+.np-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.np-info { flex: 1; min-width: 0; }
+.np-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-meta  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.np-edit  { font-size: 11px; color: var(--accent); cursor: pointer; border: none; background: none; font-family: inherit; }
+.np-edit:hover { color: var(--accent2); }
+
+/* Transport */
+.transport {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px; background: var(--bg2);
+  border: 1px solid var(--border); border-radius: var(--rl);
+  margin-bottom: 18px; display: none;
+}
+.t-btn {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--border2); background: var(--bg3);
+  color: var(--text); cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; justify-content: center; transition: all .12s;
+}
+.t-btn:hover { background: var(--bg4); }
+.t-btn.playing { background: var(--accent); border-color: var(--accent); color: #fff; }
+.t-time { font-size: 11px; color: var(--muted); min-width: 88px; letter-spacing: .05em; }
+.seek-bar {
+  flex: 1; appearance: none; -webkit-appearance: none;
+  height: 4px; background: var(--bg5); border-radius: 2px; outline: none; cursor: pointer;
+}
+.seek-bar::-webkit-slider-thumb {
+  appearance: none; width: 12px; height: 12px;
+  background: var(--accent2); border-radius: 50%; margin-top: -4px;
+}
+.seek-bar::-moz-range-thumb {
+  width: 12px; height: 12px; background: var(--accent2); border-radius: 50%; border: none;
+}
+.bpm-box  { font-size: 11px; color: var(--muted); }
+.bpm-val  { color: var(--text); font-weight: 600; }
+
+/* Channels */
+.section-head {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
+.section-label {
+  font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+}
+.preset-row { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+
+.channels { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
+
+.channel {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--rl); padding: 14px 10px;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 9px; transition: border-color .15s;
+}
+.channel.muted  { opacity: .3; }
+.channel.soloed { border-color: var(--amber); }
+.channel.master {
+  flex-direction: row; padding: 12px 18px; align-items: center;
+  grid-column: 1 / -1;
+}
+.ch-icon  { font-size: 22px; line-height: 1; }
+.ch-label { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+
+.vu-wrap { width: 100%; height: 56px; display: flex; align-items: flex-end; gap: 3px; }
+.vu-bar  { flex: 1; border-radius: 2px 2px 0 0; transition: height .07s ease; height: 0%; }
+
+.fader-wrap { width: 100%; }
+.fader {
+  width: 100%; appearance: none; -webkit-appearance: none;
+  height: 3px; background: var(--bg5); border-radius: 2px; outline: none; cursor: pointer;
+}
+.fader::-webkit-slider-thumb {
+  appearance: none; width: 15px; height: 15px;
+  background: var(--text); border-radius: 50%; box-shadow: 0 0 0 2px var(--bg2);
+}
+.fader::-moz-range-thumb {
+  width: 15px; height: 15px; background: var(--text);
+  border-radius: 50%; border: 2px solid var(--bg2);
+}
+.fader-val { font-size: 10px; color: var(--muted); text-align: center; margin-top: 3px; }
+
+.pan-wrap { width: 100%; }
+.pan-label { font-size: 10px; color: var(--muted); text-align: center; margin-bottom: 3px; }
+.pan {
+  width: 100%; appearance: none; -webkit-appearance: none;
+  height: 2px; background: var(--bg5); border-radius: 1px; outline: none; cursor: pointer;
+}
+.pan::-webkit-slider-thumb {
+  appearance: none; width: 10px; height: 10px; background: var(--muted2); border-radius: 50%;
+}
+
+.ch-btns  { display: flex; gap: 4px; width: 100%; }
+.ch-btn {
+  flex: 1; padding: 4px 0; border-radius: 5px;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--muted); cursor: pointer; font-family: inherit;
+  font-size: 9px; letter-spacing: .06em; text-transform: uppercase; transition: all .1s;
+}
+.ch-btn:hover { color: var(--text); border-color: var(--text); }
+.ch-btn.mute-on { background: var(--red);   border-color: var(--red);   color: #fff; }
+.ch-btn.solo-on { background: var(--amber); border-color: var(--amber); color: #000; }
+
+/* Edit modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.65);
+  display: none; align-items: center; justify-content: center; z-index: 100;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: var(--rl); padding: 24px; width: 320px;
+}
+.modal h3 { font-size: 14px; margin-bottom: 16px; }
+.modal label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+.modal input {
+  width: 100%; padding: 8px 10px; border-radius: var(--r);
+  border: 1px solid var(--border2); background: var(--bg3);
+  color: var(--text); font-family: inherit; font-size: 13px;
+  outline: none; margin-bottom: 12px;
+}
+.modal input:focus { border-color: var(--accent); }
+.modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+
+/* Presets panel */
+.presets-panel {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 12px; margin-bottom: 14px; display: none;
+}
+.presets-panel.open { display: block; }
+.preset-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.preset-chip {
+  padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border2);
+  background: var(--bg4); font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 5px;
+}
+.preset-chip:hover { border-color: var(--accent2); color: var(--accent2); }
+.preset-chip .del { color: var(--muted); font-size: 10px; }
+.preset-chip .del:hover { color: var(--red); }
+.preset-empty { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">STEM<span>MIXER</span></div>
+  <span class="pill pill-ok">Offline</span>
+  <div class="dep-bar" id="depBar">checking…</div>
+</div>
+
+<div class="body">
+
+  <!-- ── LIBRARY SIDEBAR ── -->
+  <div class="sidebar">
+    <div class="sidebar-head">
+      <h2>Library</h2>
+      <select class="sort-select" id="sortSelect" onchange="loadLibrary()">
+        <option value="added_at">Recent</option>
+        <option value="last_opened">Last played</option>
+        <option value="play_count">Most played</option>
+        <option value="title">Title A–Z</option>
+        <option value="duration">Duration</option>
+      </select>
+    </div>
+    <div class="search-wrap">
+      <input class="search-input" id="searchInput" placeholder="Search songs…"
+             oninput="debounceSearch()" type="search" />
+    </div>
+    <div class="lib-list" id="libList">
+      <div class="lib-empty">No songs yet.<br>Load a file to get started.</div>
+    </div>
+  </div>
+
+  <!-- ── MAIN PANE ── -->
+  <div class="main-pane">
+
+    <!-- Load zone -->
+    <div class="load-zone">
+      <div class="load-tabs">
+        <button class="tab active" onclick="switchTab('file')">Local File</button>
+        <button class="tab" onclick="switchTab('youtube')">YouTube URL</button>
+      </div>
+
+      <div class="load-panel visible" id="tab-file">
+        <div class="drop-zone" id="dropZone">
+          <input type="file" id="fileInput" accept=".mp3,.wav,.flac,.m4a,.ogg,.mp4,.mkv,.webm"
+                 onchange="handleFile(this.files[0])" />
+          <div class="drop-icon">🎵</div>
+          <div class="drop-text">
+            <strong>Drop an audio or video file here</strong>
+            MP3 · WAV · FLAC · M4A · OGG · MP4 · up to 500 MB
+          </div>
+        </div>
+      </div>
+
+      <div class="load-panel" id="tab-youtube">
+        <div class="yt-row">
+          <input type="text" id="ytInput" placeholder="https://www.youtube.com/watch?v=…" />
+          <button class="btn btn-primary" id="ytBtn" onclick="handleYoutube()">Separate stems</button>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-top:8px;">
+          Requires <strong style="color:var(--text)">yt-dlp</strong> — audio downloads locally, nothing leaves your machine.
+        </p>
+      </div>
+
+      <div class="job-bar" id="jobBar">
+        <div class="spinner" id="jobSpinner"></div>
+        <div class="job-msg">
+          <div class="job-title" id="jobTitle">Processing…</div>
+          <div class="job-sub"   id="jobSub"></div>
+        </div>
+        <div class="prog-wrap"><div class="prog-fill" id="progFill"></div></div>
+        <span id="jobPct" style="font-size:11px;color:var(--muted);min-width:30px;text-align:right">0%</span>
+      </div>
+    </div>
+
+    <!-- Mixer zone -->
+    <div class="mixer-zone" id="mixerZone">
+      <div class="empty-state" id="emptyState">
+        <div class="big">🎛️</div>
+        <p>Load a new file above, or click a song in the library to open it in the mixer.</p>
+      </div>
+
+      <!-- Now playing -->
+      <div class="now-playing" id="nowPlaying">
+        <div class="np-thumb" id="npThumb">🎵</div>
+        <div class="np-info">
+          <div class="np-title" id="npTitle">—</div>
+          <div class="np-meta"  id="npMeta">—</div>
+        </div>
+        <button class="np-edit" onclick="openEditModal()">Edit info</button>
+      </div>
+
+      <!-- Transport -->
+      <div class="transport" id="transport">
+        <button class="t-btn" onclick="seek(0)" title="Rewind">⏮</button>
+        <button class="t-btn" id="btnPlay" onclick="togglePlay()">▶</button>
+        <button class="t-btn" onclick="stopAudio()" title="Stop">⏹</button>
+        <span class="t-time" id="tTime">0:00 / 0:00</span>
+        <input type="range" class="seek-bar" id="seekBar" min="0" max="100" value="0"
+               oninput="onSeek(this.value)" step="0.1" />
+        <span class="bpm-box"><span class="bpm-val" id="bpmVal">—</span> BPM</span>
+        <button class="btn-sm" id="loopBtn" onclick="toggleLoop()">↺ Loop</button>
+      </div>
+
+      <!-- Presets panel -->
+      <div class="presets-panel" id="presetsPanel">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:var(--muted2);">Mixer presets</span>
+          <button class="btn-sm" onclick="savePreset()" style="margin-left:auto">Save preset</button>
+          <button class="btn-sm" onclick="togglePresets()" style="color:var(--muted)">✕</button>
+        </div>
+        <div class="preset-list" id="presetList"></div>
+      </div>
+
+      <!-- Channels -->
+      <div class="section-head" id="channelHead" style="display:none">
+        <span class="section-label">Instrument tracks</span>
+        <div class="preset-row">
+          <button class="btn-sm" onclick="downloadAllStems()">⬇ Download All</button>
+          <button class="btn-sm" onclick="togglePresets()">🎚 Presets</button>
+        </div>
+      </div>
+      <div class="channels" id="channels"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3>Edit song info</h3>
+    <label>Title</label>
+    <input type="text" id="editTitle" />
+    <div id="syncYtWrap" style="display:none;margin-bottom:10px;">
+      <button class="btn-sm" id="syncYtBtn" onclick="syncYTTitle()"
+              style="width:100%;text-align:center">↺ Sync title from YouTube</button>
+    </div>
+    <label>Artist</label>
+    <input type="text" id="editArtist" placeholder="optional" />
+    <div class="modal-btns">
+      <button class="btn-sm" onclick="closeEditModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEdit()" style="padding:7px 16px;font-size:12px">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ────────────────────────────────────────────────────────────────────────────
+// State
+// ────────────────────────────────────────────────────────────────────────────
+const STEM_META = {
+  drums:  { label:'Drums',  icon:'🥁', color:'#f04040' },
+  bass:   { label:'Bass',   icon:'🎸', color:'#3b8df5' },
+  other:  { label:'Guitar', icon:'🎵', color:'#22c55e' },
+  vocals: { label:'Vocals', icon:'🎤', color:'#f59e0b' },
+  piano:  { label:'Piano',  icon:'🎹', color:'#a78bfa' },
+  melody: { label:'Melody', icon:'🎷', color:'#e879f9' },
+};
+
+let ctx = null;
+const audioNodes = {};
+let startTime = 0, startOffset = 0;
+let isPlaying = false, looping = false;
+let duration = 0, rafId = null;
+let currentSongId = null;
+let masterVol = 0.8;
+const stemState = {};
+let pollTimer = null;
+let searchDebounce = null;
+let currentStemsMap = {};
+let currentSongMeta = {};
+
+// ────────────────────────────────────────────────────────────────────────────
+// Utility
+// ────────────────────────────────────────────────────────────────────────────
+const fmtTime = s => {
+  s = Math.floor(s || 0);
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+};
+const fmtDur = s => {
+  if (!s) return '—';
+  const m = Math.floor(s/60), sec = Math.floor(s%60);
+  return `${m}:${String(sec).padStart(2,'0')}`;
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// Dependency check
+// ────────────────────────────────────────────────────────────────────────────
+async function checkDeps() {
+  try {
+    const d = await (await fetch('/status')).json();
+    document.getElementById('depBar').innerHTML =
+      `<span class="${d.demucs?'dep-ok':'dep-bad'}">demucs ${d.demucs?'✓':'✗'}</span>` +
+      `<span class="${d.ytdlp?'dep-ok':'dep-bad'}">yt-dlp ${d.ytdlp?'✓':'✗'}</span>`;
+  } catch {}
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Tabs
+// ────────────────────────────────────────────────────────────────────────────
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach((b,i) =>
+    b.classList.toggle('active', ['file','youtube'][i] === t));
+  document.querySelectorAll('.load-panel').forEach((p,i) =>
+    p.classList.toggle('visible', ['file','youtube'][i] === t));
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Library
+// ────────────────────────────────────────────────────────────────────────────
+async function loadLibrary() {
+  const q    = document.getElementById('searchInput').value.trim();
+  const sort = document.getElementById('sortSelect').value;
+  const url  = `/library?sort=${sort}&order=${sort==='title'?'asc':'desc'}${q?'&q='+encodeURIComponent(q):''}`;
+  const songs = await (await fetch(url)).json();
+  renderLibrary(songs);
+}
+
+function renderLibrary(songs) {
+  const el = document.getElementById('libList');
+  if (!songs.length) {
+    el.innerHTML = '<div class="lib-empty">No songs yet.<br>Load a file to get started.</div>';
+    return;
+  }
+  el.innerHTML = songs.map(s => {
+    const thumb = s.thumbnail
+      ? `<img src="${s.thumbnail}" alt="" />`
+      : (s.source === 'youtube' ? '▶' : '🎵');
+    const srcBadge = s.source === 'youtube'
+      ? '<span class="src-badge src-yt">YT</span>'
+      : '<span class="src-badge src-file">file</span>';
+    const plays = s.play_count > 0 ? ` · ${s.play_count}×` : '';
+    const dur   = s.duration ? ` · ${fmtDur(s.duration)}` : '';
+    const bpm   = s.bpm > 0 ? ` · ${s.bpm} bpm` : '';
+    return `
+      <div class="song-card${s.id===currentSongId?' active':''}" id="lib-${s.id}"
+           onclick="openSong('${s.id}')">
+        <div class="song-thumb">${thumb}</div>
+        <div class="song-info">
+          <div class="song-title">${escHtml(s.title)}${srcBadge}</div>
+          <div class="song-meta">${escHtml(s.artist||'')}${dur}${bpm}${plays}</div>
+        </div>
+        <button class="song-del" onclick="deleteSong(event,'${s.id}')" title="Remove">✕</button>
+      </div>`;
+  }).join('');
+}
+
+function debounceSearch() {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(loadLibrary, 250);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function deleteSong(e, id) {
+  e.stopPropagation();
+  if (!confirm('Remove this song from the library and delete its stems?')) return;
+  await fetch(`/library/${id}`, { method: 'DELETE' });
+  if (currentSongId === id) {
+    stopAll();
+    currentSongId = null;
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('nowPlaying').style.display = 'none';
+    document.getElementById('transport').style.display  = 'none';
+    document.getElementById('channelHead').style.display = 'none';
+    document.getElementById('channels').innerHTML = '';
+  }
+  loadLibrary();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Open a song from library
+// ────────────────────────────────────────────────────────────────────────────
+async function openSong(id) {
+  if (currentSongId === id) return;
+  const song = await (await fetch(`/library/${id}`)).json();
+  if (song.error) { alert(song.error); return; }
+  currentSongId = id;
+  currentSongMeta = song;
+  document.querySelectorAll('.song-card').forEach(c =>
+    c.classList.toggle('active', c.id === 'lib-' + id));
+
+  showNowPlaying(song);
+  await loadStems(id, song.stems, song.duration, song);
+  if (song.bpm > 0) document.getElementById('bpmVal').textContent = song.bpm;
+  loadLibrary();
+}
+
+function showNowPlaying(song) {
+  document.getElementById('nowPlaying').style.display = 'flex';
+  document.getElementById('npTitle').textContent = song.title;
+  document.getElementById('npMeta').textContent  =
+    [song.artist, song.source === 'youtube' ? 'YouTube' : 'Local file',
+     fmtDur(song.duration)].filter(Boolean).join(' · ');
+  const thumb = document.getElementById('npThumb');
+  thumb.innerHTML = song.thumbnail
+    ? `<img src="${song.thumbnail}" alt="" />`
+    : (song.source === 'youtube' ? '▶' : '🎵');
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Drop zone & upload
+// ────────────────────────────────────────────────────────────────────────────
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); handleFile(e.dataTransfer.files[0]); });
+
+async function handleFile(file) {
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  showJob('Uploading…', 0);
+  const d = await (await fetch('/upload', { method:'POST', body:fd })).json();
+  if (d.error) { showJobError(d.error); return; }
+  pollJob(d.job_id);
+}
+
+async function handleYoutube() {
+  const url = document.getElementById('ytInput').value.trim();
+  if (!url) return;
+  currentSongMeta = { source: 'youtube', source_url: url };
+  showJob('Submitting URL…', 0);
+  const d = await (await fetch('/youtube', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ url })
+  })).json();
+  if (d.error) { showJobError(d.error); return; }
+  if (d.title) showJob('Fetched: ' + d.title, 0);
+  pollJob(d.job_id);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Job polling
+// ────────────────────────────────────────────────────────────────────────────
+function showJob(msg, pct, sub='') {
+  const bar = document.getElementById('jobBar');
+  bar.classList.add('visible'); bar.style.borderColor = '';
+  document.getElementById('jobTitle').textContent = msg;
+  document.getElementById('jobSub').textContent   = sub;
+  document.getElementById('progFill').style.width = pct + '%';
+  document.getElementById('jobPct').textContent   = Math.round(pct) + '%';
+  document.getElementById('jobSpinner').style.display = pct < 100 ? 'block' : 'none';
+}
+
+function showJobError(msg) {
+  const bar = document.getElementById('jobBar');
+  bar.classList.add('visible'); bar.style.borderColor = 'var(--red)';
+  document.getElementById('jobTitle').textContent = '✗ ' + msg;
+  document.getElementById('jobSpinner').style.display = 'none';
+}
+
+const STATUS_LABELS = {
+  queued:      'Queued…',
+  downloading: 'Downloading audio…',
+  separating:  'AI stem separation (Demucs)…',
+  done:        'Done! Saved to library.',
+  error:       'Error',
+};
+
+function pollJob(jobId) {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    try {
+      const d = await (await fetch('/job/' + jobId)).json();
+      const pct = d.status === 'done' ? 100 : (d.progress || 0);
+      showJob(STATUS_LABELS[d.status] || d.status, pct, d.message || '');
+      if (d.status === 'done') {
+        clearInterval(pollTimer);
+        loadLibrary();
+        currentSongId = jobId;
+        showNowPlaying({ title: d.title || 'Track', source: 'file', duration: d.duration, thumbnail: '' });
+        await loadStems(jobId, d.stems, d.duration, { title: d.title });
+        detectBPM(jobId);
+      }
+      if (d.status === 'error') clearInterval(pollTimer);
+    } catch {}
+  }, 800);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Audio engine
+// ────────────────────────────────────────────────────────────────────────────
+async function loadStems(songId, stemMap, dur, song) {
+  currentStemsMap = stemMap || {};
+  currentSongMeta = song || {};
+  stopAll();
+  Object.keys(audioNodes).forEach(k => {
+    try { audioNodes[k].gainNode && audioNodes[k].gainNode.disconnect(); } catch {}
+    delete audioNodes[k];
+  });
+  Object.keys(stemState).forEach(k => delete stemState[k]);
+
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const masterGain = ctx.createGain();
+  masterGain.gain.value = masterVol;
+  masterGain.connect(ctx.destination);
+  audioNodes['_master'] = masterGain;
+
+  const stemKeys = Object.keys(stemMap);
+  let loaded = 0;
+  showJob('Loading audio buffers…', 0);
+
+  for (const key of stemKeys) {
+    try {
+      const ab  = await (await fetch(stemMap[key])).arrayBuffer();
+      const buf = await ctx.decodeAudioData(ab);
+      if (!dur) dur = buf.duration;
+      const gain = ctx.createGain();
+      const pan  = ctx.createStereoPanner();
+      gain.connect(pan); pan.connect(masterGain);
+      audioNodes[key] = { buffer: buf, gain, pan, source: null };
+      stemState[key]  = { vol: 0.8, muted: false, soloed: false, pan: 0 };
+      gain.gain.value = 0.8;
+    } catch(e) { console.error('Failed loading', key, e); }
+    loaded++;
+    showJob('Loading audio buffers…', (loaded / stemKeys.length) * 100);
+  }
+
+  duration = dur || 0;
+  document.getElementById('transport').style.display  = 'flex';
+  document.getElementById('nowPlaying').style.display = 'flex';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('channelHead').style.display = 'flex';
+  document.getElementById('seekBar').max = duration;
+  document.getElementById('tTime').textContent = '0:00 / ' + fmtTime(duration);
+  buildMixerUI(stemKeys);
+  loadPresetsPanel(songId);
+  showJob('Ready', 100);
+}
+
+function playSources(offset) {
+  Object.entries(audioNodes).forEach(([k, n]) => {
+    if (k === '_master') return;
+    const src = ctx.createBufferSource();
+    src.buffer = n.buffer;
+    src.loop   = looping;
+    src.connect(n.gain);
+    src.start(0, Math.min(offset, n.buffer.duration - 0.01));
+    n.source = src;
+    src.onended = () => { if (isPlaying && !looping) onEnded(); };
+  });
+}
+
+function stopSources() {
+  Object.entries(audioNodes).forEach(([k, n]) => {
+    if (k === '_master') return;
+    try { n.source && n.source.stop(); n.source && n.source.disconnect(); } catch {}
+    n.source = null;
+  });
+}
+
+function stopAll() {
+  stopSources();
+  isPlaying   = false;
+  startOffset = 0;
+  cancelAnimationFrame(rafId);
+  const btn = document.getElementById('btnPlay');
+  if (btn) { btn.textContent = '▶'; btn.classList.remove('playing'); }
+}
+
+function togglePlay() {
+  if (!ctx) return;
+  if (isPlaying) {
+    startOffset = currentOffset();
+    stopSources();
+    isPlaying = false;
+    cancelAnimationFrame(rafId);
+    document.getElementById('btnPlay').textContent = '▶';
+    document.getElementById('btnPlay').classList.remove('playing');
+  } else {
+    startTime = ctx.currentTime;
+    playSources(startOffset);
+    isPlaying = true;
+    document.getElementById('btnPlay').textContent = '⏸';
+    document.getElementById('btnPlay').classList.add('playing');
+    rafId = requestAnimationFrame(tick);
+  }
+}
+
+function stopAudio() {
+  stopAll();
+  document.getElementById('seekBar').value = 0;
+  document.getElementById('tTime').textContent = '0:00 / ' + fmtTime(duration);
+}
+
+function seek(t) {
+  const was = isPlaying;
+  if (isPlaying) { stopSources(); isPlaying = false; }
+  startOffset = Math.max(0, Math.min(t, duration));
+  if (was) {
+    startTime = ctx.currentTime;
+    playSources(startOffset);
+    isPlaying = true;
+    document.getElementById('btnPlay').textContent = '⏸';
+    document.getElementById('btnPlay').classList.add('playing');
+    rafId = requestAnimationFrame(tick);
+  } else {
+    document.getElementById('seekBar').value = startOffset;
+    document.getElementById('tTime').textContent = fmtTime(startOffset) + ' / ' + fmtTime(duration);
+  }
+}
+
+function onSeek(v) { seek(parseFloat(v)); }
+function currentOffset() {
+  return isPlaying ? startOffset + (ctx.currentTime - startTime) : startOffset;
+}
+function onEnded() {
+  stopAll();
+  document.getElementById('seekBar').value = 0;
+  document.getElementById('tTime').textContent = '0:00 / ' + fmtTime(duration);
+}
+function toggleLoop() {
+  looping = !looping;
+  document.getElementById('loopBtn').style.color = looping ? 'var(--accent2)' : '';
+  Object.entries(audioNodes).forEach(([k,n]) => {
+    if (k !== '_master' && n.source) n.source.loop = looping;
+  });
+}
+
+function tick() {
+  if (!isPlaying) return;
+  const off = Math.min(currentOffset(), duration);
+  document.getElementById('seekBar').value = off;
+  document.getElementById('tTime').textContent = fmtTime(off) + ' / ' + fmtTime(duration);
+  animateVU();
+  if (off >= duration && !looping) { onEnded(); return; }
+  rafId = requestAnimationFrame(tick);
+}
+
+function animateVU() {
+  const hasSolo = Object.values(stemState).some(s => s.soloed);
+  Object.entries(stemState).forEach(([k, st]) => {
+    const el = document.getElementById('vu-' + k);
+    if (!el) return;
+    const bars   = el.querySelectorAll('.vu-bar');
+    const muted  = st.muted || (hasSolo && !st.soloed);
+    const active = isPlaying && !muted;
+    bars[0] && (bars[0].style.height = (active ? (35 + Math.random()*60)*st.vol : 0) + '%');
+    bars[1] && (bars[1].style.height = (active ? (25 + Math.random()*70)*st.vol : 0) + '%');
+  });
+}
+
+function applyGains() {
+  const hasSolo = Object.values(stemState).some(s => s.soloed);
+  Object.entries(audioNodes).forEach(([k, n]) => {
+    if (k === '_master') return;
+    const st    = stemState[k];
+    const muted = st.muted || (hasSolo && !st.soloed);
+    n.gain.gain.setTargetAtTime(muted ? 0 : st.vol, ctx.currentTime, 0.02);
+  });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// BPM detection
+// ────────────────────────────────────────────────────────────────────────────
+function detectBPM(songId) {
+  const key = 'drums' in audioNodes ? 'drums' : Object.keys(audioNodes).find(k => k !== '_master');
+  if (!key) return;
+  const buf  = audioNodes[key].buffer;
+  const data = buf.getChannelData(0);
+  const sr   = buf.sampleRate;
+  const hop  = Math.floor(sr * 0.01);
+  const energies = [];
+  for (let i = 0; i < data.length - hop; i += hop) {
+    let e = 0;
+    for (let j = 0; j < hop; j++) e += data[i+j] * data[i+j];
+    energies.push(e / hop);
+  }
+  const mean = energies.reduce((a,b)=>a+b,0) / energies.length;
+  const thr  = mean * 1.5;
+  const peaks = [];
+  let lastPeak = -1;
+  for (let i = 1; i < energies.length - 1; i++) {
+    if (energies[i] > thr && energies[i] > energies[i-1] && energies[i] > energies[i+1]) {
+      if (lastPeak < 0 || i - lastPeak > 20) { peaks.push(i); lastPeak = i; }
+    }
+  }
+  if (peaks.length > 4) {
+    const intervals = [];
+    for (let i = 1; i < Math.min(peaks.length, 20); i++) intervals.push(peaks[i]-peaks[i-1]);
+    const avg = intervals.reduce((a,b)=>a+b,0) / intervals.length;
+    const bpm = Math.round(60 / (avg * hop / sr));
+    if (bpm > 40 && bpm < 300) {
+      document.getElementById('bpmVal').textContent = bpm;
+      if (songId) fetch(`/library/${songId}/bpm`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ bpm })
+      });
+    }
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Mixer UI
+// ────────────────────────────────────────────────────────────────────────────
+function buildMixerUI(stemKeys) {
+  const grid = document.getElementById('channels');
+  grid.innerHTML = '';
+
+  stemKeys.forEach(key => {
+    const meta = STEM_META[key] || { label: key, icon: '🎵', color: '#7c6af7' };
+    const st   = stemState[key];
+    const ch   = document.createElement('div');
+    ch.className = 'channel';
+    ch.id = 'ch-' + key;
+    ch.innerHTML = `
+      <div class="ch-icon">${meta.icon}</div>
+      <div class="ch-label">${meta.label}</div>
+      <div class="vu-wrap" id="vu-${key}">
+        <div class="vu-bar" style="background:${meta.color}"></div>
+        <div class="vu-bar" style="background:${meta.color}"></div>
+      </div>
+      <div class="fader-wrap">
+        <input type="range" class="fader" min="0" max="1" step="0.01"
+               value="${st.vol}" oninput="setVol('${key}',this.value)" />
+        <div class="fader-val" id="fv-${key}">${Math.round(st.vol*100)}%</div>
+      </div>
+      <div class="pan-wrap">
+        <div class="pan-label">Pan</div>
+        <input type="range" class="pan" min="-1" max="1" step="0.05"
+               value="${st.pan}" oninput="setPan('${key}',this.value)" />
+      </div>
+      <div class="ch-btns">
+        <button class="ch-btn" id="mute-${key}" onclick="toggleMute('${key}')">Mute</button>
+        <button class="ch-btn" id="solo-${key}" onclick="toggleSolo('${key}')">Solo</button>
+      </div>
+      <button class="ch-btn" onclick="downloadStem('${key}')"
+              style="width:100%;margin-top:2px">⬇ Save</button>`;
+    grid.appendChild(ch);
+  });
+
+  // Master
+  const master = document.createElement('div');
+  master.className = 'channel master';
+  master.innerHTML = `
+    <span class="ch-label" style="min-width:52px">Master</span>
+    <div class="fader-wrap">
+      <input type="range" class="fader" min="0" max="1" step="0.01"
+             value="${masterVol}" oninput="setMaster(this.value)" />
+    </div>
+    <div style="font-size:11px;color:var(--muted);min-width:34px;text-align:right" id="mv-pct">${Math.round(masterVol*100)}%</div>
+    <div class="vu-wrap" id="vu-master" style="margin-left:12px;width:50px">
+      <div class="vu-bar" style="background:var(--accent)"></div>
+      <div class="vu-bar" style="background:var(--accent)"></div>
+    </div>`;
+  grid.appendChild(master);
+}
+
+function setVol(key, val) {
+  stemState[key].vol = parseFloat(val);
+  document.getElementById('fv-'+key).textContent = Math.round(val*100) + '%';
+  if (ctx) applyGains();
+}
+function setPan(key, val) {
+  stemState[key].pan = parseFloat(val);
+  if (audioNodes[key]) audioNodes[key].pan.pan.setTargetAtTime(parseFloat(val), ctx.currentTime, 0.01);
+}
+function setMaster(val) {
+  masterVol = parseFloat(val);
+  document.getElementById('mv-pct').textContent = Math.round(val*100) + '%';
+  if (audioNodes['_master']) audioNodes['_master'].gain.value = masterVol;
+}
+function toggleMute(key) {
+  stemState[key].muted = !stemState[key].muted;
+  document.getElementById('mute-'+key).classList.toggle('mute-on', stemState[key].muted);
+  document.getElementById('ch-'+key).classList.toggle('muted',    stemState[key].muted);
+  if (ctx) applyGains();
+}
+function toggleSolo(key) {
+  stemState[key].soloed = !stemState[key].soloed;
+  document.getElementById('solo-'+key).classList.toggle('solo-on', stemState[key].soloed);
+  document.getElementById('ch-'+key).classList.toggle('soloed',    stemState[key].soloed);
+  if (ctx) applyGains();
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Presets
+// ────────────────────────────────────────────────────────────────────────────
+function togglePresets() {
+  document.getElementById('presetsPanel').classList.toggle('open');
+}
+
+async function loadPresetsPanel(songId) {
+  if (!songId) return;
+  const presets = await (await fetch(`/library/${songId}/presets`)).json();
+  const list = document.getElementById('presetList');
+  if (!presets.length) {
+    list.innerHTML = '<div class="preset-empty">No presets saved yet.</div>';
+    return;
+  }
+  list.innerHTML = presets.map(p => `
+    <div class="preset-chip" onclick="applyPreset('${p.id}','${escHtml(p.state_json)}')">
+      ${escHtml(p.name)}
+      <span class="del" onclick="deletePreset(event,'${p.id}','${songId}')">✕</span>
+    </div>`).join('');
+}
+
+async function savePreset() {
+  if (!currentSongId) return;
+  const name = prompt('Preset name:', 'My mix') || 'Preset';
+  const state = {};
+  Object.entries(stemState).forEach(([k,s]) => state[k] = {...s});
+  state['_master'] = { vol: masterVol };
+  await fetch(`/library/${currentSongId}/presets`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name, state })
+  });
+  loadPresetsPanel(currentSongId);
+}
+
+function applyPreset(id, stateJson) {
+  try {
+    const state = JSON.parse(stateJson.replace(/&quot;/g,'"'));
+    Object.entries(state).forEach(([k, s]) => {
+      if (k === '_master') { setMaster(s.vol); document.querySelector('.fader[oninput*="_master"]') && (document.querySelector('.fader[oninput*="_master"]').value = s.vol); return; }
+      if (!stemState[k]) return;
+      stemState[k].vol    = s.vol;    setVol(k, s.vol);
+      stemState[k].pan    = s.pan;    setPan(k, s.pan);
+      stemState[k].muted  = false;
+      stemState[k].soloed = false;
+      document.getElementById('mute-'+k)?.classList.remove('mute-on');
+      document.getElementById('solo-'+k)?.classList.remove('solo-on');
+      document.getElementById('ch-'+k)?.classList.remove('muted','soloed');
+      if (s.muted)  toggleMute(k);
+      if (s.soloed) toggleSolo(k);
+      const fader = document.querySelector(`#ch-${k} .fader`);
+      if (fader) fader.value = s.vol;
+    });
+  } catch(e) { console.error('Preset parse error', e); }
+}
+
+async function deletePreset(e, presetId, songId) {
+  e.stopPropagation();
+  await fetch(`/presets/${presetId}`, { method:'DELETE' });
+  loadPresetsPanel(songId);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Edit modal
+// ────────────────────────────────────────────────────────────────────────────
+function openEditModal() {
+  document.getElementById('editTitle').value  = document.getElementById('npTitle').textContent;
+  document.getElementById('editArtist').value = currentSongMeta.artist || '';
+  const isYT = currentSongMeta.source === 'youtube' && currentSongMeta.source_url;
+  document.getElementById('syncYtWrap').style.display = isYT ? 'block' : 'none';
+  document.getElementById('editModal').classList.add('open');
+}
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('open');
+}
+
+async function syncYTTitle() {
+  const url = currentSongMeta.source_url;
+  if (!url) return;
+  const btn = document.getElementById('syncYtBtn');
+  btn.textContent = 'Fetching…';
+  btn.disabled = true;
+  try {
+    const info = await (await fetch('/yt-title?url=' + encodeURIComponent(url))).json();
+    if (info.title && info.title !== 'YouTube Track') {
+      document.getElementById('editTitle').value = info.title;
+      if (info.uploader) document.getElementById('editArtist').value = info.uploader;
+    } else {
+      alert('Could not fetch title — YouTube may be blocking the request.');
+    }
+  } catch(e) { alert('Error fetching title.'); }
+  btn.textContent = '↺ Sync title from YouTube';
+  btn.disabled = false;
+}
+
+function downloadStem(key) {
+  const url = currentStemsMap[key];
+  if (!url) return;
+  const title = (currentSongMeta.title || 'stem').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${title}_${key}.wav`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+async function downloadAllStems() {
+  const keys = Object.keys(currentStemsMap);
+  if (!keys.length) { alert('No stems loaded.'); return; }
+  for (const key of keys) {
+    downloadStem(key);
+    await new Promise(r => setTimeout(r, 400));
+  }
+}
+async function submitEdit() {
+  if (!currentSongId) return;
+  const title  = document.getElementById('editTitle').value.trim();
+  const artist = document.getElementById('editArtist').value.trim();
+  if (!title) return;
+  await fetch(`/library/${currentSongId}`, {
+    method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ title, artist })
+  });
+  document.getElementById('npTitle').textContent = title;
+  closeEditModal();
+  loadLibrary();
+}
+document.getElementById('editModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('editModal')) closeEditModal();
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Init
+// ────────────────────────────────────────────────────────────────────────────
+checkDeps();
+loadLibrary();
+</script>
+</body>
+</html>

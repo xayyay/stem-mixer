@@ -1,0 +1,28 @@
+# Python virtual environment
+lib/
+bin/
+include/
+share/
+pyvenv.cfg
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# App runtime data (generated, not source)
+uploads/
+stems_output/
+static/
+library.db
+
+# Sensitive / local-only files
+cookies.txt
+*.txt.bak
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
