@@ -773,7 +773,7 @@ async function loadStems(songId, stemMap, dur, song) {
   let loaded = 0;
   showJob('Loading audio buffers…', 0);
 
-  for (const key of stemKeys) {
+  await Promise.all(stemKeys.map(async (key) => {
     try {
       const ab  = await (await fetch(stemMap[key])).arrayBuffer();
       const buf = await ctx.decodeAudioData(ab);
@@ -787,7 +787,7 @@ async function loadStems(songId, stemMap, dur, song) {
     } catch(e) { console.error('Failed loading', key, e); }
     loaded++;
     showJob('Loading audio buffers…', (loaded / stemKeys.length) * 100);
-  }
+  }));
 
   duration = dur || 0;
   document.getElementById('transport').style.display  = 'flex';

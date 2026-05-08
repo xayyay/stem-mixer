@@ -424,7 +424,9 @@ def serve_stem(song_id, filename):
             stem_dir = row["stem_dir"]
     if not stem_dir or not Path(stem_dir).exists():
         return "Stem not found", 404
-    return send_from_directory(stem_dir, filename)
+    resp = send_from_directory(stem_dir, filename)
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
 
 
 if __name__ == "__main__":
