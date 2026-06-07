@@ -2,3 +2,4 @@ flask>=3.0.0
 demucs>=4.0.0
 yt-dlp>=2024.1.0
 pytubefix>=6.0.0
+pywebview>=4.0.0
